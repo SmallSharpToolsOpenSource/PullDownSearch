@@ -143,6 +143,8 @@ typedef NS_ENUM(NSUInteger, CollectionCellType) {
     CollectionCellTypeFooter   = 3
 };
 
+static const NSInteger SearchResultsSectionIndex = 1;
+
 @implementation PullDownCollectionViewController
 
 - (void)viewDidLoad {
@@ -155,13 +157,13 @@ typedef NS_ENUM(NSUInteger, CollectionCellType) {
     NSLog(@"Reloading Data");
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refresh) object:nil];
 
-    NSIndexSet *indexSet = [NSIndexSet indexSetWithIndex:1];
+    NSIndexSet *indexSet = [NSIndexSet indexSetWithIndex:SearchResultsSectionIndex];
     [self.collectionView reloadSections:indexSet];
-//    [self.collectionView reloadData];
 }
 
 - (NSInteger)sectionCount {
     if (self.searchView.isActive) {
+        // Sections: search field, search results, footer
         return 3;
     }
     else {
