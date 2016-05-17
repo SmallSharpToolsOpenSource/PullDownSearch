@@ -165,7 +165,7 @@ typedef NS_ENUM(NSUInteger, CollectionCellType) {
         return 3;
     }
     else {
-        return BoxSectionCount;
+        return BoxSectionCount + 2; // add search and footer sections
     }
 }
 
