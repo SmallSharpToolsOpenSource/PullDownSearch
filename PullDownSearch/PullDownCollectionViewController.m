@@ -9,8 +9,8 @@
 #import "PullDownCollectionViewController.h"
 
 static CGFloat SearchViewHeight = 50.0;
-static NSInteger SectionCount = 5;
-static NSInteger BoxCount = 30;
+static NSInteger BoxSectionCount = 5;
+static NSInteger BoxCount = 20;
 
 @class SearchView;
 
@@ -19,6 +19,8 @@ static NSInteger BoxCount = 30;
 @protocol SearchViewDelegate <NSObject>
 
 - (void)searchView:(SearchView *)searchView didChangeText:(NSString *)text;
+- (void)searchViewDidBecomeActive:(SearchView *)searchView;
+- (void)searchViewDidBecomeInactive:(SearchView *)searchView;
 
 @end
 
@@ -26,10 +28,16 @@ static NSInteger BoxCount = 30;
 
 @property (weak, nonatomic) id<SearchViewDelegate> delegate;
 
+@property (readonly, nonatomic) NSString *searchText;
 @property (assign, nonatomic, getter=isActive) BOOL active;
 
-@property (weak, nonatomic) IBOutlet UITextField *searchField;
+- (void)takeFocus;
 
+@end
+
+@interface SearchView ()
+
+@property (weak, nonatomic) IBOutlet UITextField *searchField;
 @property (weak, nonatomic) UITapGestureRecognizer *tapGesture;
 
 @end
@@ -46,9 +54,21 @@ static NSInteger BoxCount = 30;
     self.tapGesture = tapGesture;
 }
 
+- (void)takeFocus {
+    [self.searchField becomeFirstResponder];
+}
+
 - (void)tapToSearch:(UITapGestureRecognizer *)sender {
     [self.searchField becomeFirstResponder];
     [self setActive:YES animate:YES];
+}
+
+- (NSString *)searchText {
+    return self.searchField.text;
+}
+
+- (void)setActive:(BOOL)active {
+    [self setActive:active animate:NO];
 }
 
 - (void)setActive:(BOOL)active animate:(BOOL)animate {
@@ -60,6 +80,16 @@ static NSInteger BoxCount = 30;
 
 - (void)updateUI:(BOOL)animated {
     self.tapGesture.enabled = !self.isActive;
+    if (self.active) {
+        if ([self.delegate respondsToSelector:@selector(searchViewDidBecomeActive:)]) {
+            [self.delegate searchViewDidBecomeActive:self];
+        }
+    }
+    else {
+        if ([self.delegate respondsToSelector:@selector(searchViewDidBecomeInactive:)]) {
+            [self.delegate searchViewDidBecomeInactive:self];
+        }
+    }
 }
 
 - (IBAction)textEditingChanged:(id)sender {
@@ -68,24 +98,10 @@ static NSInteger BoxCount = 30;
     }
 }
 
-//- (void)drawRect:(CGRect)rect {
-//    [super drawRect:rect];
-//    if (self.isActive) {
-//        [self.searchField becomeFirstResponder];
-//    }
-//}
-
-//- (void)prepareForReuse {
-////    [self setNeedsDisplay];
-//    if (self.isActive) {
-//        [self.searchField becomeFirstResponder];
-//    }
-//}
-
 #pragma mark - UITextFieldDelegate
 
 - (void)textFieldDidBeginEditing:(UITextField *)textField {
-    self.active = true;
+    self.active = YES;
 }
 
 - (BOOL)textFieldShouldClear:(UITextField *)textField {
@@ -97,6 +113,8 @@ static NSInteger BoxCount = 30;
 
 #pragma mark -
 
+static NSString * const BoxCellIdentifier = @"BoxCell";
+
 @interface BoxCell : UICollectionViewCell
 
 @property (weak, nonatomic) IBOutlet UIView *boxView;
@@ -104,6 +122,7 @@ static NSInteger BoxCount = 30;
 @end
 
 @implementation BoxCell
+
 @end
 
 #pragma mark -
@@ -112,13 +131,19 @@ static NSInteger BoxCount = 30;
 
 @property (weak, nonatomic) SearchView *searchView;
 
-@property (readonly) NSInteger lastSection;
+@property (readonly) NSInteger sectionCount;
+@property (readonly) NSInteger lastSectionIndex;
 
 @end
 
-@implementation PullDownCollectionViewController
+typedef NS_ENUM(NSUInteger, CollectionCellType) {
+    CollectionCellTypeNone     = 0,
+    CollectionCellTypeSearch   = 1,
+    CollectionCellTypeBox      = 2,
+    CollectionCellTypeFooter   = 3
+};
 
-static NSString * const reuseIdentifier = @"BoxCell";
+@implementation PullDownCollectionViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -129,27 +154,68 @@ static NSString * const reuseIdentifier = @"BoxCell";
 - (void)refresh {
     NSLog(@"Reloading Data");
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(refresh) object:nil];
-    [self.collectionView reloadData];
+
+    NSIndexSet *indexSet = [NSIndexSet indexSetWithIndex:1];
+    [self.collectionView reloadSections:indexSet];
+//    [self.collectionView reloadData];
 }
 
-- (NSInteger)lastSection {
-    return SectionCount - 1;
+- (NSInteger)sectionCount {
+    if (self.searchView.isActive) {
+        return 3;
+    }
+    else {
+        return BoxSectionCount;
+    }
+}
+
+- (NSInteger)lastSectionIndex {
+    return self.sectionCount - 1;
+}
+
+- (CollectionCellType)cellTypeForSection:(NSInteger)section {
+    if (section == 0) {
+        return CollectionCellTypeSearch;
+    }
+    else if (section == self.lastSectionIndex) {
+        return CollectionCellTypeFooter;
+    }
+    else {
+        return CollectionCellTypeBox;
+    }
 }
 
 #pragma mark UICollectionViewDataSource
 
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
-    return SectionCount;
+    return self.sectionCount;
 }
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
-    return BoxCount;
+    CollectionCellType cellType = [self cellTypeForSection:section];
+    switch (cellType) {
+        case CollectionCellTypeSearch:
+            return 0;
+            break;
+        case CollectionCellTypeBox:
+            return self.searchView.isActive ? self.searchView.searchText.length : BoxCount;
+            break;
+        case CollectionCellTypeFooter:
+            return 0;
+            break;
+
+        default:
+            NSAssert(NO, @"All cell types should return a value.");
+            break;
+    }
+
+    return 0;
 }
 
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath {
-    BoxCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:@"BoxCell" forIndexPath:indexPath];
-    cell.boxView.backgroundColor = indexPath.item % 2 == 0 ? [UIColor lightGrayColor] : [UIColor blueColor];
-    return cell;
+    BoxCell *boxCell = [collectionView dequeueReusableCellWithReuseIdentifier:BoxCellIdentifier forIndexPath:indexPath];
+    boxCell.boxView.backgroundColor = indexPath.item % 2 == 0 ? [UIColor lightGrayColor] : [UIColor blueColor];
+    return boxCell;
 }
 
 - (UICollectionReusableView *)collectionView:(UICollectionView *)collectionView viewForSupplementaryElementOfKind:(NSString *)kind atIndexPath:(NSIndexPath *)indexPath {
@@ -169,6 +235,11 @@ static NSString * const reuseIdentifier = @"BoxCell";
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
     CGFloat width = CGRectGetWidth(collectionView.bounds);
+    CollectionCellType cellType = [self cellTypeForSection:indexPath.section];
+    if (cellType == CollectionCellTypeSearch || cellType == CollectionCellTypeFooter) {
+        return CGSizeMake(width, 2.0);
+    }
+
     CGFloat length = width / 5;
     return CGSizeMake(length, length);
 }
@@ -182,7 +253,7 @@ static NSString * const reuseIdentifier = @"BoxCell";
 }
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(nonnull UICollectionViewLayout *)collectionViewLayout referenceSizeForFooterInSection:(NSInteger)section {
-    if (section < self.lastSection) {
+    if (section < self.lastSectionIndex) {
         return CGSizeZero;
     }
     return CGSizeMake(self.collectionView.bounds.size.width, 60);
@@ -190,12 +261,34 @@ static NSString * const reuseIdentifier = @"BoxCell";
 
 #pragma mark - UICollectionViewDelegate
 
-// nothing to do
+- (BOOL)collectionView:(UICollectionView *)collectionView shouldSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    return YES;
+}
+
+- (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    NSLog(@"Selected: %ld, %ld", (long)indexPath.section, (long)indexPath.item);
+    [collectionView deselectItemAtIndexPath:indexPath animated:YES];
+}
 
 #pragma mark - SearchViewDelegate
 
 - (void)searchView:(SearchView *)searchView didChangeText:(NSString *)text {
+    NSLog(@"Search: %@", text);
     [self performSelector:@selector(refresh) withObject:nil afterDelay:0.25];
+}
+
+- (void)searchViewDidBecomeActive:(SearchView *)searchView {
+    NSLog(@"Search: Active");
+    // reloading is necessary to set alternate section structure
+    [self.collectionView reloadData];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        [self.searchView takeFocus];
+    });
+}
+
+- (void)searchViewDidBecomeInactive:(SearchView *)searchView {
+    NSLog(@"Search: Inactive");
+    [self.collectionView reloadData];
 }
 
 @end
