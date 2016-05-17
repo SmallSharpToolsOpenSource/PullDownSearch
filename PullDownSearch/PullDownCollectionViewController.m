@@ -9,7 +9,8 @@
 #import "PullDownCollectionViewController.h"
 
 static CGFloat SearchViewHeight = 50.0;
-static NSUInteger BoxCount = 10;
+static NSInteger SectionCount = 5;
+static NSInteger BoxCount = 30;
 
 @class SearchView;
 
@@ -43,7 +44,6 @@ static NSUInteger BoxCount = 10;
     tapGesture.numberOfTapsRequired = 1;
     [self addGestureRecognizer:tapGesture];
     self.tapGesture = tapGesture;
-
 }
 
 - (void)tapToSearch:(UITapGestureRecognizer *)sender {
@@ -68,16 +68,19 @@ static NSUInteger BoxCount = 10;
     }
 }
 
-- (void)drawRect:(CGRect)rect {
-    [super drawRect:rect];
-    if (self.isActive) {
-        [self.searchField becomeFirstResponder];
-    }
-}
+//- (void)drawRect:(CGRect)rect {
+//    [super drawRect:rect];
+//    if (self.isActive) {
+//        [self.searchField becomeFirstResponder];
+//    }
+//}
 
-- (void)prepareForReuse {
-    [self setNeedsDisplay];
-}
+//- (void)prepareForReuse {
+////    [self setNeedsDisplay];
+//    if (self.isActive) {
+//        [self.searchField becomeFirstResponder];
+//    }
+//}
 
 #pragma mark - UITextFieldDelegate
 
@@ -109,6 +112,8 @@ static NSUInteger BoxCount = 10;
 
 @property (weak, nonatomic) SearchView *searchView;
 
+@property (readonly) NSInteger lastSection;
+
 @end
 
 @implementation PullDownCollectionViewController
@@ -127,10 +132,14 @@ static NSString * const reuseIdentifier = @"BoxCell";
     [self.collectionView reloadData];
 }
 
+- (NSInteger)lastSection {
+    return SectionCount - 1;
+}
+
 #pragma mark UICollectionViewDataSource
 
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView {
-    return 1;
+    return SectionCount;
 }
 
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section {
@@ -161,12 +170,22 @@ static NSString * const reuseIdentifier = @"BoxCell";
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
     CGFloat width = CGRectGetWidth(collectionView.bounds);
     CGFloat length = width / 5;
-    if (indexPath.item != 0 && indexPath.item % 11 ==0) {
-        return CGSizeMake(width, length);
+    return CGSizeMake(length, length);
+}
+
+- (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout*)collectionViewLayout referenceSizeForHeaderInSection:(NSInteger)section {
+    // Note: The header section will include the search field
+    if (section > 0) {
+        return CGSizeZero;
     }
-    else {
-        return CGSizeMake(length, length);
+    return CGSizeMake(CGRectGetWidth(self.collectionView.bounds), 50.0);
+}
+
+- (CGSize)collectionView:(UICollectionView *)collectionView layout:(nonnull UICollectionViewLayout *)collectionViewLayout referenceSizeForFooterInSection:(NSInteger)section {
+    if (section < self.lastSection) {
+        return CGSizeZero;
     }
+    return CGSizeMake(self.collectionView.bounds.size.width, 60);
 }
 
 #pragma mark - UICollectionViewDelegate
